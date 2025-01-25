@@ -8,12 +8,12 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function generateStoreAssets(tokenName) {
+async function generateStoreAssets(businessName) {
   try {
     // Generate logo using DALL-E
     const logoResponse = await openai.images.generate({
       model: "dall-e-3",
-      prompt: `A modern, professional logo for a cryptocurrency token called ${tokenName}. Minimal, clean design.`,
+      prompt: `A modern, professional logo for a business about ${businessName}. Minimal, clean design.`,
       n: 1,
       response_format: "url",
       size: "1024x1024",
@@ -23,7 +23,7 @@ async function generateStoreAssets(tokenName) {
     // Generate banner image
     const bannerResponse = await openai.images.generate({
       model: "dall-e-3",
-      prompt: `A wide banner image representing ${tokenName} cryptocurrency community. Modern, abstract design with subtle branding.`,
+      prompt: `A wide banner image representing ${businessName} business. Modern, abstract design with subtle branding.`,
       n: 1,
       size: "1792x1024",
       response_format: "url",
@@ -36,7 +36,7 @@ async function generateStoreAssets(tokenName) {
       messages: [
         {
           role: "user",
-          content: `Write a compelling description for a Whop store dedicated to the ${tokenName} token community. Include benefits, features, and a bold claim. Format in markdown.`,
+          content: `Write a compelling description for a Whop store dedicated to the ${businessName} business. Include benefits, features, and a bold claim. Format in markdown.`,
         },
       ],
     });
@@ -49,7 +49,7 @@ async function generateStoreAssets(tokenName) {
       messages: [
         {
           role: "user",
-          content: `Write a bold, attention-grabbing one-liner claim for the ${tokenName} token community.`,
+          content: `Write a bold, attention-grabbing one-liner claim for the ${businessName} business.`,
         },
       ],
     });
@@ -73,8 +73,8 @@ async function downloadAndConvertImage(url) {
   return Buffer.from(response.data).toString("base64");
 }
 
-async function prepareStoreAssets(tokenName) {
-  const assets = await generateStoreAssets(tokenName);
+async function prepareStoreAssets(businessName) {
+  const assets = await generateStoreAssets(businessName);
 
   const [logoBase64, bannerBase64, logoImageBuffer, bannerImageBuffer] =
     await Promise.all([
@@ -97,9 +97,9 @@ async function prepareStoreAssets(tokenName) {
   };
 }
 
-async function createWhopStore(companyId, tokenName) {
+async function createWhopStore(companyId, businessName) {
   try {
-    let data = `[\n    {\n        "companyId": "${companyId}",\n        "title": "${tokenName}",\n        "name": "${tokenName}",\n        "headline": "test",\n        "activateWhopFour": true\n    }\n]`;
+    let data = `[\n    {\n        "companyId": "${companyId}",\n        "title": "${businessName}",\n        "name": "${businessName}",\n        "headline": "test",\n        "activateWhopFour": true\n    }\n]`;
 
     let config = {
       method: "post",
@@ -281,7 +281,7 @@ async function uploadLogoImage(
   productRoute,
   companyId,
   accessPassId,
-  tokenName,
+  businessName,
   boldClaim,
   description
 ) {
@@ -300,7 +300,7 @@ async function uploadLogoImage(
       companyId,
       accessPassId,
       imageUrl,
-      tokenName,
+      businessName,
       boldClaim,
       description
     );
@@ -315,7 +315,7 @@ async function uploadWhopLogoImage(
   companyId,
   accessPassId,
   imageUrl,
-  tokenName
+  businessName
 ) {
   const response = await fetch("https://whop.com/tokenization-cf/", {
     headers: {
@@ -344,7 +344,7 @@ async function uploadWhopLogoImage(
       "Referrer-Policy": "strict-origin-when-cross-origin",
       Cookie: process.env.WHOP_COOKIE,
     },
-    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"${tokenName}","headline":"${boldCLaim}","shortenedDescription":"${description}","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
+    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"${businessName}","headline":"${boldCLaim}","shortenedDescription":"${description}","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
     method: "POST",
   });
 
@@ -418,13 +418,13 @@ async function updateWhopWithImage(
   });
 }
 
-async function createEnhancedWhop(tokenName) {
+async function createEnhancedWhop(businessName) {
   try {
-    console.log("Creating enhanced whop for", tokenName);
+    console.log("Creating enhanced whop for", businessName);
     const companyId = "biz_xpYFVNnIXn36wK";
 
-    const assets = await prepareStoreAssets(tokenName);
-    const { id, route } = await createWhopStore(companyId, tokenName);
+    const assets = await prepareStoreAssets(businessName);
+    const { id, route } = await createWhopStore(companyId, businessName);
 
     // Upload banner image if available
     if (assets.logoImageBuffer) {
@@ -433,7 +433,7 @@ async function createEnhancedWhop(tokenName) {
         route,
         companyId,
         id,
-        tokenName,
+        businessName,
         assets.boldClaim,
         assets.description
       );
@@ -512,6 +512,7 @@ let processedTweetIds = [
   "1882996477053809037",
   "1883001471031198152",
   "1882999543354331140",
+  "1883002213074878916",
 ];
 
 async function fetchNotifications() {
@@ -572,11 +573,11 @@ async function fetchNotifications() {
           );
 
           if (match) {
-            const tokenName = match[1];
-            console.log(`Found token name: $${tokenName}`);
+            const businessName = match[1];
+            console.log(`Found token name: $${businessName}`);
             processedTweetIds.push(tweetId); // Add tweet ID to processed list
             // You can now proceed to create a Whop store for this token
-            const route = await createEnhancedWhop(tokenName);
+            const route = await createEnhancedWhop(businessName);
             await replyToTweet(tweetId, route);
           }
         }
