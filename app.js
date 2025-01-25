@@ -283,7 +283,8 @@ async function uploaLogoImage(
   imageBuffer,
   productRoute,
   companyId,
-  accessPassId
+  accessPassId,
+  tokenName
 ) {
   try {
     // Step 1: Get presigned URL
@@ -299,7 +300,8 @@ async function uploaLogoImage(
       productRoute,
       companyId,
       accessPassId,
-      imageUrl
+      imageUrl,
+      tokenName
     );
   } catch (error) {
     console.error("Error uploading logo image:", error);
@@ -311,7 +313,8 @@ async function uploadWhopLogoImage(
   productRoute,
   companyId,
   accessPassId,
-  imageUrl
+  imageUrl,
+  tokenName
 ) {
   const response = await fetch("https://whop.com/tokenization-cf/", {
     headers: {
@@ -386,7 +389,7 @@ async function createEnhancedWhop(tokenName) {
 
     // Upload banner image if available
     if (assets.logoImageBuffer) {
-      await uploaLogoImage(assets.logoImageBuffer, route, companyId, id);
+      await uploaLogoImage(assets.logoImageBuffer, route, companyId, id, tokenName);
     }
 
     if (assets.bannerImageBuffer) {
