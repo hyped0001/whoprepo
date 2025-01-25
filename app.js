@@ -467,33 +467,38 @@ function parseTweetInstructions(tweetText) {
 }
 
 async function replyToTweet(tweetId, productRoute) {
-  fetch("https://x.com/i/api/graphql/_aUkOlYcrHMY3LR-lUVuSg/CreateTweet", {
-    headers: {
-      accept: "*/*",
-      "accept-language": "en-US,en;q=0.9",
-      authorization: process.env.TWITTER_KEY,
-      "content-type": "application/json",
-      "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
-      "sec-ch-ua-mobile": "?0",
-      "sec-ch-ua-platform": '"macOS"',
-      "sec-fetch-dest": "empty",
-      "sec-fetch-mode": "cors",
-      "sec-fetch-site": "same-origin",
-      "x-client-transaction-id":
-        "ucvQBsSLfFDLJeXKKILzikrqMgBcgogAmY4ZsIGLpMRte2aj1df/E4wQH8tkGMGdcuNB/brspL2sdD0PaO8U2J+uiLN3ug",
-      "x-client-uuid": "ec88267e-bfd6-4f4f-9175-20d8ffb5a066",
-      "x-csrf-token":
-        "6ca947b4fd335753a4c9f8132bc508612d0981da07ce20f953fe7b7acd79de6d70244b1ee2826f238772dfb26aad21038d6279c6ca20540585fad5398a260e6897518a4547331b8c3257c6bdac6b1147",
-      "x-twitter-active-user": "yes",
-      "x-twitter-auth-type": "OAuth2Session",
-      "x-twitter-client-language": "en",
-      Cookie: process.env.TWITTER_COOKIE,
-      Referer: "https://x.com/compose/post",
-      "Referrer-Policy": "strict-origin-when-cross-origin",
-    },
-    body: `{"variables":{"tweet_text":"Here\'s your WHOP! https://whop.com/${productRoute}/","reply":{"in_reply_to_tweet_id":"${tweetId}","exclude_reply_user_ids":[]},"dark_request":false,"media":{"media_entities":[],"possibly_sensitive":false},"semantic_annotation_ids":[],"disallowed_reply_options":null},"features":{"premium_content_api_read_enabled":false,"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,"responsive_web_jetfuel_frame":false,"responsive_web_grok_share_attachment_enabled":true,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"creator_subscriptions_quote_tweet_preview_enabled":false,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,"rweb_tipjar_consumption_enabled":true,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"articles_preview_enabled":true,"rweb_video_timestamps_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"responsive_web_grok_image_annotation_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_enhance_cards_enabled":false},"queryId":"_aUkOlYcrHMY3LR-lUVuSg"}`,
-    method: "POST",
-  });
+  const response = await fetch(
+    "https://x.com/i/api/graphql/_aUkOlYcrHMY3LR-lUVuSg/CreateTweet",
+    {
+      headers: {
+        accept: "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        authorization: process.env.TWITTER_KEY,
+        "content-type": "application/json",
+        priority: "u=1, i",
+        "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "x-client-transaction-id":
+          "ggIfR+osS23DfDb8hb9ktfgAUBZxGiPfvL0CP+0II6MbGtibw++A2CNo4jx+Iep9iHqEx4FNSBGfKgvnNaJVRubJEIsLgQ",
+        "x-client-uuid": "ec88267e-bfd6-4f4f-9175-20d8ffb5a066",
+        "x-csrf-token":
+          "7e658ae6c2ef040770e5bd59fc267aff07bf408ab3514630164590c8d0589cb930a25e4b2576dd16a6a06d579565d91af9cf53ec0ee4e94ad068a1562561c57696b54912840e572025b112b2fbcd9157",
+        "x-twitter-active-user": "yes",
+        "x-twitter-auth-type": "OAuth2Session",
+        "x-twitter-client-language": "en",
+        cookie: process.env.TWITTER_COOKIE,
+        Referer: "https://x.com/notifications/mentions",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+      },
+      body: `{"variables":{"tweet_text":"Here's your WHOP! https://whop.com/${productRoute}/","reply":{"in_reply_to_tweet_id":"${tweetId}","exclude_reply_user_ids":[]},"dark_request":false,"media":{"media_entities":[],"possibly_sensitive":false},"semantic_annotation_ids":[],"disallowed_reply_options":null},"features":{"premium_content_api_read_enabled":false,"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,"responsive_web_jetfuel_frame":false,"responsive_web_grok_share_attachment_enabled":true,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"creator_subscriptions_quote_tweet_preview_enabled":false,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,"rweb_tipjar_consumption_enabled":true,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"articles_preview_enabled":true,"rweb_video_timestamps_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"responsive_web_grok_image_annotation_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_enhance_cards_enabled":false},"queryId":"_aUkOlYcrHMY3LR-lUVuSg"}`,
+      method: "POST",
+    }
+  );
+  console.log("Reply to tweet response", response);
 }
 let processedTweetIds = [
   "1882969151230386272",
