@@ -3,70 +3,68 @@ require("dotenv").config();
 const OpenAI = require("openai");
 const axios = require("axios");
 
-// Initialize OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+let processedTweetIds = [];
+
 async function generateStoreAssets(businessName) {
   try {
-    // Generate logo using DALL-E
-    const logoResponse = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: `A modern, professional logo for a business about ${businessName}. Minimal, clean design.`,
-      n: 1,
-      response_format: "url",
-      size: "1024x1024",
-    });
+    const [
+      logoResponse,
+      bannerResponse,
+      descriptionResponse,
+      claimResponse,
+      titleResponse,
+    ] = await Promise.all([
+      openai.images.generate({
+        model: "dall-e-3",
+        prompt: `A modern, professional logo for a business about ${businessName}. Minimal, clean design.`,
+        n: 1,
+        response_format: "url",
+        size: "1024x1024",
+      }),
+      openai.images.generate({
+        model: "dall-e-3",
+        prompt: `A wide banner image representing ${businessName} business. Modern, abstract design with subtle branding.`,
+        n: 1,
+        size: "1792x1024",
+        response_format: "url",
+      }),
+      openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "user",
+            content: `Write a compelling description for a Whop store dedicated to the ${businessName} business. Include benefits, features, and a bold claim. Format in markdown.`,
+          },
+        ],
+      }),
+      openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "user",
+            content: `Write a bold, attention-grabbing one-liner claim for the ${businessName} business. Maximum 60 characters.`,
+          },
+        ],
+      }),
+      openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "user",
+            content: `Write a bold, attention-grabbing one-liner title for the ${businessName} business. The title should be a single sentence that captures the essence of the business and describes the outcome. EX: for a sports betting busienss: "REAL $5,000 - $50,000 BET SLIPS DAILY FROM LAS VEGFAS! Maximum 30 characters.`,
+          },
+        ],
+      }),
+    ]);
+
     const logoUrl = logoResponse.data[0].url;
-
-    // Generate banner image
-    const bannerResponse = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: `A wide banner image representing ${businessName} business. Modern, abstract design with subtle branding.`,
-      n: 1,
-      size: "1792x1024",
-      response_format: "url",
-    });
     const bannerUrl = bannerResponse.data[0].url;
-
-    // Generate description using GPT-4
-    const descriptionResponse = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "user",
-          content: `Write a compelling description for a Whop store dedicated to the ${businessName} business. Include benefits, features, and a bold claim. Format in markdown.`,
-        },
-      ],
-    });
-
     const description = descriptionResponse.choices[0].message.content;
-
-    // Generate bold claim
-    const claimResponse = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "user",
-          content: `Write a bold, attention-grabbing one-liner claim for the ${businessName} business. Maximum 60 characters.`,
-        },
-      ],
-    });
-
     const boldClaim = claimResponse.choices[0].message.content.slice(0, 60);
-
-    // Generate bold title
-    const titleResponse = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "user",
-          content: `Write a bold, attention-grabbing one-liner title for the ${businessName} business. The title should be a single sentence that captures the essence of the business and describes the outcome. EX: for a sports betting busienss: "REAL $5,000 - $50,000 BET SLIPS DAILY FROM LAS VEGFAS! Maximum 30 characters.`,
-        },
-      ],
-    });
-
     const title = titleResponse.choices[0].message.content.slice(0, 30);
 
     return {
@@ -113,17 +111,6 @@ async function prepareStoreAssets(businessName) {
 
 async function createWhopStore(companyId, businessName, boldClaim) {
   try {
-    let data = JSON.stringify([
-      {
-        companyId: companyId,
-        title: businessName,
-        name: businessName,
-        headline: boldClaim,
-        activateWhopFour: true,
-      },
-    ]);
-    console.log(data);
-
     let config = {
       method: "post",
       maxBodyLength: Infinity,
@@ -154,13 +141,19 @@ async function createWhopStore(companyId, businessName, boldClaim) {
         "Content-Type": "text/plain;charset=UTF-8",
         Cookie: process.env.WHOP_COOKIE,
       },
-      data: data,
+      data: JSON.stringify([
+        {
+          companyId: companyId,
+          title: businessName,
+          name: businessName,
+          headline: boldClaim,
+          activateWhopFour: true,
+        },
+      ]),
     };
 
     const response = await axios.request(config);
-    console.log("create store", response.body);
 
-    // Parse the response data which is in a special format
     const lines = response.data.split("\n");
     const dataLine = lines.find((line) => line.includes('"data"'));
 
@@ -168,7 +161,6 @@ async function createWhopStore(companyId, businessName, boldClaim) {
       throw new Error("Could not find data in response");
     }
 
-    // Extract the JSON object from the line
     const jsonMatch = dataLine.match(/\{.*\}/);
     if (!jsonMatch) {
       throw new Error("Could not extract JSON from response");
@@ -231,7 +223,7 @@ async function createChatApp(productRoute, companyId, accessPassId) {
       method: "POST",
     });
 
-    console.log("create chat", response.status);
+    console.log(`create chat status [${response.status}]`);
     return;
   } catch (error) {
     console.error("Error creating chat app:", error);
@@ -239,65 +231,81 @@ async function createChatApp(productRoute, companyId, accessPassId) {
   }
 }
 
-async function getPresignedUrl(fileExtension = "jpeg") {
-  const response = await fetch(
-    "https://whop.com/api/graphql/fetchPresignedUploadUrl/",
-    {
-      headers: {
-        accept: "*/*",
-        "accept-language": "en-US,en;q=0.9",
-        baggage:
-          "sentry-environment=vercel-production,sentry-release=114ce94bff2e4ca0274a74a7a94a94c60f71db1a,sentry-public_key=a0eeb19ab96e2033121600d07dfe6a12,sentry-trace_id=d324805972004e9b8a9aeb1860806996,sentry-sample_rate=0,sentry-sampled=false",
-        "content-type": "application/json",
-        newrelic:
-          "eyJ2IjpbMCwxXSwiZCI6eyJ0eSI6IkJyb3dzZXIiLCJhYyI6IjQyMDA1MTciLCJhcCI6IjExMjAzNDcwMjkiLCJpZCI6IjQ5NjIwMzQ4M2VjZDRhMDgiLCJ0ciI6ImMzOTc3Y2U3MjAzZDI1NjJiYzY3ODc0MWZlMDU2NDg4IiwidGkiOjE3Mzc3Nzc4MjU3NjN9fQ==",
-        "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "sentry-trace": "d324805972004e9b8a9aeb1860806996-9a686bf25cd13eba-0",
-        traceparent: "00-c3977ce7203d2562bc678741fe056488-496203483ecd4a08-01",
-        tracestate:
-          "4200517@nr=0-1-4200517-1120347029-496203483ecd4a08----1737777825763",
-        "x-whop-gclid": "",
-        "x-whop-id": "biz_xpYFVNnIXn36wK",
-        "x-whop-introspection": "1",
-        "x-whop-traffic-source": "",
-        Cookie: process.env.WHOP_COOKIE,
-        Referer: "https://whop.com/consstruction-12/",
-        "Referrer-Policy": "strict-origin-when-cross-origin",
-      },
-      body: '{"query":"\\n    mutation fetchPresignedUploadUrl($input: PresignedUploadInput!) {\\n  presignedUpload(input: $input)\\n}\\n    ","variables":{"input":{"fileExtV2":"png","isPublic":true}},"operationName":"fetchPresignedUploadUrl"}',
-      method: "POST",
-    }
-  );
-  const data = await response.json();
-  return data.data.presignedUpload;
+async function getPresignedUrl() {
+  try {
+    const response = await fetch(
+      "https://whop.com/api/graphql/fetchPresignedUploadUrl/",
+      {
+        headers: {
+          accept: "*/*",
+          "accept-language": "en-US,en;q=0.9",
+          baggage:
+            "sentry-environment=vercel-production,sentry-release=114ce94bff2e4ca0274a74a7a94a94c60f71db1a,sentry-public_key=a0eeb19ab96e2033121600d07dfe6a12,sentry-trace_id=d324805972004e9b8a9aeb1860806996,sentry-sample_rate=0,sentry-sampled=false",
+          "content-type": "application/json",
+          newrelic:
+            "eyJ2IjpbMCwxXSwiZCI6eyJ0eSI6IkJyb3dzZXIiLCJhYyI6IjQyMDA1MTciLCJhcCI6IjExMjAzNDcwMjkiLCJpZCI6IjQ5NjIwMzQ4M2VjZDRhMDgiLCJ0ciI6ImMzOTc3Y2U3MjAzZDI1NjJiYzY3ODc0MWZlMDU2NDg4IiwidGkiOjE3Mzc3Nzc4MjU3NjN9fQ==",
+          "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"macOS"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "sentry-trace": "d324805972004e9b8a9aeb1860806996-9a686bf25cd13eba-0",
+          traceparent:
+            "00-c3977ce7203d2562bc678741fe056488-496203483ecd4a08-01",
+          tracestate:
+            "4200517@nr=0-1-4200517-1120347029-496203483ecd4a08----1737777825763",
+          "x-whop-gclid": "",
+          "x-whop-id": process.env.WHOP_COMPANY_ID,
+          "x-whop-introspection": "1",
+          "x-whop-traffic-source": "",
+          Cookie: process.env.WHOP_COOKIE,
+          Referer: "https://whop.com/consstruction-12/",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+        },
+        body: '{"query":"\\n    mutation fetchPresignedUploadUrl($input: PresignedUploadInput!) {\\n  presignedUpload(input: $input)\\n}\\n    ","variables":{"input":{"fileExtV2":"png","isPublic":true}},"operationName":"fetchPresignedUploadUrl"}',
+        method: "POST",
+      }
+    );
+    const data = await response.json();
+
+    const presignedUrl = data.data.presignedUpload;
+    console.log(`presigned url [${presignedUrl}]`);
+
+    return presignedUrl;
+  } catch (error) {
+    console.error("Error getting presigned url:", error);
+    throw error;
+  }
 }
 
 async function uploadImageToS3(presignedUrl, imageBuffer) {
-  const response = await fetch(presignedUrl, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "image/jpeg",
-      Accept: "*/*",
-      Origin: "https://whop.com",
-      "Sec-Fetch-Site": "same-site",
-      "Sec-Fetch-Mode": "cors",
-      "Sec-Fetch-Dest": "empty",
-    },
-    body: imageBuffer,
-  });
+  try {
+    const response = await fetch(presignedUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "image/jpeg",
+        Accept: "*/*",
+        Origin: "https://whop.com",
+        "Sec-Fetch-Site": "same-site",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Dest": "empty",
+      },
+      body: imageBuffer,
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to upload image: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Failed to upload image: ${response.status}`);
+    }
+
+    const uploadedUrl = presignedUrl.split("?")[0];
+    console.log(`uploaded url [${uploadedUrl}]`);
+
+    return uploadedUrl;
+  } catch (error) {
+    console.error("Error uploading image to S3:", error);
+    throw error;
   }
-
-  // Extract the final URL from the presigned URL
-  const uploadedUrl = presignedUrl.split("?")[0];
-  return uploadedUrl;
 }
 
 async function uploadLogoImage(
@@ -307,16 +315,10 @@ async function uploadLogoImage(
   accessPassId
 ) {
   try {
-    // Step 1: Get presigned URL
-    const presignedUrl = await getPresignedUrl("jpeg");
-    console.log("Presigned URL:", presignedUrl);
-
-    // Step 2: Upload image to S3
+    const presignedUrl = await getPresignedUrl();
     const imageUrl = await uploadImageToS3(presignedUrl, imageBuffer);
-    console.log("Uploaded Image URL:", imageUrl);
 
-    // Step 3: Update Whop with the new image
-    return await uploadWhopLogoImage(
+    return await updateLogoImage(
       productRoute,
       companyId,
       accessPassId,
@@ -328,44 +330,49 @@ async function uploadLogoImage(
   }
 }
 
-async function uploadWhopLogoImage(
+async function updateLogoImage(
   productRoute,
   companyId,
   accessPassId,
   imageUrl
 ) {
-  const response = await fetch(`https://whop.com/${productRoute}/`, {
-    headers: {
-      accept: "text/x-component",
-      "accept-language": "en-US,en;q=0.9",
-      baggage:
-        "sentry-environment=vercel-production,sentry-release=114ce94bff2e4ca0274a74a7a94a94c60f71db1a,sentry-public_key=a0eeb19ab96e2033121600d07dfe6a12,sentry-trace_id=a0be055d20eb4eb0a0ca1febfa4510d1,sentry-sample_rate=0,sentry-sampled=false",
-      "content-type": "text/plain;charset=UTF-8",
-      newrelic:
-        "eyJ2IjpbMCwxXSwiZCI6eyJ0eSI6IkJyb3dzZXIiLCJhYyI6IjQyMDA1MTciLCJhcCI6IjExMjAzNDcwMjkiLCJpZCI6ImM5MmI3OTI4ODdhMzk5NzgiLCJ0ciI6ImZkMGRiZWUxZWY3ODNkMjNhOTQ2Y2JiMDQ2NGNhMDE1IiwidGkiOjE3Mzc3NzcyNjk3MjZ9fQ==",
-      "next-action": "0d2386c25adce7fa1d2610040374916127470e0d",
-      "next-router-state-tree":
-        "%5B%22%22%2C%7B%22children%22%3A%5B%5B%22locale%22%2C%22en%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22authenticated%22%2C%22true%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22embedded%22%2C%22false%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22(desktop)%22%2C%7B%22children%22%3A%5B%22(store)%22%2C%7B%22children%22%3A%5B%5B%22productRoute%22%2C%22tokenization-cf%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22planId%22%2C%22-%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22(with-layout)%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2C%22%2Ftokenization-cf%2F%22%2C%22refresh%22%5D%7D%2Cnull%2Cnull%2Ctrue%5D%7D%5D%7D%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%2C%22modal%22%3A%5B%22__DEFAULT__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%2Ctrue%5D",
-      "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
-      "sec-ch-ua-mobile": "?0",
-      "sec-ch-ua-platform": '"macOS"',
-      "sec-fetch-dest": "empty",
-      "sec-fetch-mode": "cors",
-      "sec-fetch-site": "same-origin",
-      "sentry-trace": "a0be055d20eb4eb0a0ca1febfa4510d1-a1c87c1150539e67-0",
-      traceparent: "00-fd0dbee1ef783d23a946cbb0464ca015-c92b792887a39978-01",
-      tracestate:
-        "4200517@nr=0-1-4200517-1120347029-c92b792887a39978----1737777269726",
-      "x-deployment-id": "dpl_EwLWMxzZVg8Yuq726Pbv6xHEiqLo",
-      Referer: `https://whop.com/${productRoute}/`,
-      "Referrer-Policy": "strict-origin-when-cross-origin",
-      Cookie: process.env.WHOP_COOKIE,
-    },
-    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"$undefined","headline":"$undefined","shortenedDescription":"$undefined","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
-    method: "POST",
-  });
-
-  console.log("logo upload status", response.status);
+  try {
+    const response = await fetch(`https://whop.com/${productRoute}/`, {
+      headers: {
+        accept: "text/x-component",
+        "accept-language": "en-US,en;q=0.9",
+        baggage:
+          "sentry-environment=vercel-production,sentry-release=114ce94bff2e4ca0274a74a7a94a94c60f71db1a,sentry-public_key=a0eeb19ab96e2033121600d07dfe6a12,sentry-trace_id=a0be055d20eb4eb0a0ca1febfa4510d1,sentry-sample_rate=0,sentry-sampled=false",
+        "content-type": "text/plain;charset=UTF-8",
+        newrelic:
+          "eyJ2IjpbMCwxXSwiZCI6eyJ0eSI6IkJyb3dzZXIiLCJhYyI6IjQyMDA1MTciLCJhcCI6IjExMjAzNDcwMjkiLCJpZCI6ImM5MmI3OTI4ODdhMzk5NzgiLCJ0ciI6ImZkMGRiZWUxZWY3ODNkMjNhOTQ2Y2JiMDQ2NGNhMDE1IiwidGkiOjE3Mzc3NzcyNjk3MjZ9fQ==",
+        "next-action": "0d2386c25adce7fa1d2610040374916127470e0d",
+        "next-router-state-tree":
+          "%5B%22%22%2C%7B%22children%22%3A%5B%5B%22locale%22%2C%22en%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22authenticated%22%2C%22true%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22embedded%22%2C%22false%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22(desktop)%22%2C%7B%22children%22%3A%5B%22(store)%22%2C%7B%22children%22%3A%5B%5B%22productRoute%22%2C%22tokenization-cf%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22planId%22%2C%22-%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22(with-layout)%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2C%22%2Ftokenization-cf%2F%22%2C%22refresh%22%5D%7D%2Cnull%2Cnull%2Ctrue%5D%7D%5D%7D%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%2C%22modal%22%3A%5B%22__DEFAULT__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%2Ctrue%5D",
+        "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "sentry-trace": "a0be055d20eb4eb0a0ca1febfa4510d1-a1c87c1150539e67-0",
+        traceparent: "00-fd0dbee1ef783d23a946cbb0464ca015-c92b792887a39978-01",
+        tracestate:
+          "4200517@nr=0-1-4200517-1120347029-c92b792887a39978----1737777269726",
+        "x-deployment-id": "dpl_EwLWMxzZVg8Yuq726Pbv6xHEiqLo",
+        Referer: `https://whop.com/${productRoute}/`,
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        Cookie: process.env.WHOP_COOKIE,
+      },
+      body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"$undefined","headline":"$undefined","shortenedDescription":"$undefined","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
+      method: "POST",
+    });
+    console.log(`logo upload status [${response.status}]`);
+    return;
+  } catch (error) {
+    console.error("Error uploading logo image:", error);
+    throw error;
+  }
 }
 
 async function uploadBannerImage(
@@ -375,16 +382,10 @@ async function uploadBannerImage(
   accessPassId
 ) {
   try {
-    // Step 1: Get presigned URL
-    const presignedUrl = await getPresignedUrl("jpeg");
-    console.log("Presigned URL:", presignedUrl);
-
-    // Step 2: Upload image to S3
+    const presignedUrl = await getPresignedUrl();
     const imageUrl = await uploadImageToS3(presignedUrl, imageBuffer);
-    console.log("Uploaded Image URL:", imageUrl);
 
-    // Step 3: Update Whop with the new image
-    return await updateWhopWithImage(
+    return await updateBannerImage(
       productRoute,
       companyId,
       accessPassId,
@@ -396,49 +397,56 @@ async function uploadBannerImage(
   }
 }
 
-async function updateWhopWithImage(
+async function updateBannerImage(
   productRoute,
   companyId,
   accessPassId,
   imageUrl
 ) {
-  const response = await fetch(`https://whop.com/${productRoute}/`, {
-    headers: {
-      accept: "text/x-component",
-      "accept-language": "en-US,en;q=0.9",
-      baggage:
-        "sentry-environment=vercel-production,sentry-release=114ce94bff2e4ca0274a74a7a94a94c60f71db1a,sentry-public_key=a0eeb19ab96e2033121600d07dfe6a12,sentry-trace_id=353805dfff1e4d81bacb93797b500ab4,sentry-sample_rate=0,sentry-sampled=false",
-      "content-type": "text/plain;charset=UTF-8",
-      newrelic:
-        "eyJ2IjpbMCwxXSwiZCI6eyJ0eSI6IkJyb3dzZXIiLCJhYyI6IjQyMDA1MTciLCJhcCI6IjExMjAzNDcwMjkiLCJpZCI6ImE3OGI3NzJmYzQ0NjczY2MiLCJ0ciI6ImFlNmE5YzVkMGE2ZWQzOGNkYmVmZDQ1NWY0NzI2MDQxIiwidGkiOjE3Mzc3Nzg4ODIyOTZ9fQ==",
-      "next-action": "0d2386c25adce7fa1d2610040374916127470e0d",
-      "next-router-state-tree":
-        "%5B%22%22%2C%7B%22children%22%3A%5B%5B%22locale%22%2C%22en%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22authenticated%22%2C%22true%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22embedded%22%2C%22false%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22(desktop)%22%2C%7B%22children%22%3A%5B%22(store)%22%2C%7B%22children%22%3A%5B%5B%22productRoute%22%2C%22consstruction-12%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22planId%22%2C%22-%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22(with-layout)%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2C%22%2Fconsstruction-12%2F%22%2C%22refresh%22%5D%7D%2Cnull%2Cnull%2Ctrue%5D%7D%5D%7D%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%2C%22modal%22%3A%5B%22__DEFAULT__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%2Ctrue%5D",
-      priority: "u=1, i",
-      "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
-      "sec-ch-ua-mobile": "?0",
-      "sec-ch-ua-platform": '"macOS"',
-      "sec-fetch-dest": "empty",
-      "sec-fetch-mode": "cors",
-      "sec-fetch-site": "same-origin",
-      "sentry-trace": "353805dfff1e4d81bacb93797b500ab4-b960837a8e16c34b-0",
-      traceparent: "00-ae6a9c5d0a6ed38cdbefd455f4726041-a78b772fc44673cc-01",
-      tracestate:
-        "4200517@nr=0-1-4200517-1120347029-a78b772fc44673cc----1737778882296",
-      "x-deployment-id": "dpl_EwLWMxzZVg8Yuq726Pbv6xHEiqLo",
-      Cookie: process.env.WHOP_COOKIE,
-      Referer: "https://whop.com/consstruction-12/",
-      "Referrer-Policy": "strict-origin-when-cross-origin",
-    },
-    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"$undefined","headline":"$undefined","shortenedDescription":"$undefined","creatorPitch":"$undefined","visibility":"$undefined","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"$undefined","route":"$undefined"},"images":["${imageUrl}"],"affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
-    method: "POST",
-  });
+  try {
+    const response = await fetch(`https://whop.com/${productRoute}/`, {
+      headers: {
+        accept: "text/x-component",
+        "accept-language": "en-US,en;q=0.9",
+        baggage:
+          "sentry-environment=vercel-production,sentry-release=114ce94bff2e4ca0274a74a7a94a94c60f71db1a,sentry-public_key=a0eeb19ab96e2033121600d07dfe6a12,sentry-trace_id=353805dfff1e4d81bacb93797b500ab4,sentry-sample_rate=0,sentry-sampled=false",
+        "content-type": "text/plain;charset=UTF-8",
+        newrelic:
+          "eyJ2IjpbMCwxXSwiZCI6eyJ0eSI6IkJyb3dzZXIiLCJhYyI6IjQyMDA1MTciLCJhcCI6IjExMjAzNDcwMjkiLCJpZCI6ImE3OGI3NzJmYzQ0NjczY2MiLCJ0ciI6ImFlNmE5YzVkMGE2ZWQzOGNkYmVmZDQ1NWY0NzI2MDQxIiwidGkiOjE3Mzc3Nzg4ODIyOTZ9fQ==",
+        "next-action": "0d2386c25adce7fa1d2610040374916127470e0d",
+        "next-router-state-tree":
+          "%5B%22%22%2C%7B%22children%22%3A%5B%5B%22locale%22%2C%22en%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22authenticated%22%2C%22true%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22embedded%22%2C%22false%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22(desktop)%22%2C%7B%22children%22%3A%5B%22(store)%22%2C%7B%22children%22%3A%5B%5B%22productRoute%22%2C%22consstruction-12%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%5B%22planId%22%2C%22-%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22(with-layout)%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2C%22%2Fconsstruction-12%2F%22%2C%22refresh%22%5D%7D%2Cnull%2Cnull%2Ctrue%5D%7D%5D%7D%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%2C%22modal%22%3A%5B%22__DEFAULT__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%2Ctrue%5D",
+        priority: "u=1, i",
+        "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "sentry-trace": "353805dfff1e4d81bacb93797b500ab4-b960837a8e16c34b-0",
+        traceparent: "00-ae6a9c5d0a6ed38cdbefd455f4726041-a78b772fc44673cc-01",
+        tracestate:
+          "4200517@nr=0-1-4200517-1120347029-a78b772fc44673cc----1737778882296",
+        "x-deployment-id": "dpl_EwLWMxzZVg8Yuq726Pbv6xHEiqLo",
+        Cookie: process.env.WHOP_COOKIE,
+        Referer: "https://whop.com/consstruction-12/",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+      },
+      body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"$undefined","headline":"$undefined","shortenedDescription":"$undefined","creatorPitch":"$undefined","visibility":"$undefined","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"$undefined","route":"$undefined"},"images":["${imageUrl}"],"affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
+      method: "POST",
+    });
+    console.log(`banner upload status [${response.status}]`);
+    return;
+  } catch (error) {
+    console.error("Error uploading banner image:", error);
+    throw error;
+  }
 }
 
 async function createEnhancedWhop(businessName) {
   try {
     console.log("Creating enhanced whop for", businessName);
-    const companyId = "biz_xpYFVNnIXn36wK";
+    const companyId = process.env.WHOP_COMPANY_ID;
 
     const assets = await prepareStoreAssets(businessName);
     const { id, route } = await createWhopStore(
@@ -447,19 +455,15 @@ async function createEnhancedWhop(businessName) {
       assets.boldClaim
     );
 
-    // Upload banner image if available
     if (assets.logoImageBuffer) {
       await uploadLogoImage(assets.logoImageBuffer, route, companyId, id);
     }
-
     if (assets.bannerImageBuffer) {
       await uploadBannerImage(assets.bannerImageBuffer, route, companyId, id);
-    } else {
-      console.log("No banner image buffer found");
     }
 
-    // Add chat app to the store
     await createChatApp(route, companyId, id);
+
     return route;
   } catch (error) {
     console.error("Error creating enhanced whop:", error);
@@ -467,108 +471,98 @@ async function createEnhancedWhop(businessName) {
   }
 }
 
-function parseTweetInstructions(tweetText) {
+async function replyToTweet(tweetId, productRoute) {
   try {
-    // Remove @GenerateWhop mention and trim
-    const cleanText = tweetText.replace(/@GenerateWhop/g, "").trim();
-
-    // Extract token name - looking for $ symbol followed by text
-    const tokenMatch = cleanText.match(/\$([A-Za-z0-9]+)/);
-    if (!tokenMatch) {
-      return null;
-    }
-
-    return tokenMatch[1];
+    const response = await fetch(
+      "https://x.com/i/api/graphql/_aUkOlYcrHMY3LR-lUVuSg/CreateTweet",
+      {
+        headers: {
+          accept: "*/*",
+          "accept-language": "en-US,en;q=0.9",
+          authorization: process.env.TWITTER_BEARER_TOKEN,
+          "content-type": "application/json",
+          priority: "u=1, i",
+          "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"macOS"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "x-client-transaction-id":
+            "ggIfR+osS23DfDb8hb9ktfgAUBZxGiPfvL0CP+0II6MbGtibw++A2CNo4jx+Iep9iHqEx4FNSBGfKgvnNaJVRubJEIsLgQ",
+          "x-client-uuid": "ec88267e-bfd6-4f4f-9175-20d8ffb5a066",
+          "x-csrf-token":
+            "7e658ae6c2ef040770e5bd59fc267aff07bf408ab3514630164590c8d0589cb930a25e4b2576dd16a6a06d579565d91af9cf53ec0ee4e94ad068a1562561c57696b54912840e572025b112b2fbcd9157",
+          "x-twitter-active-user": "yes",
+          "x-twitter-auth-type": "OAuth2Session",
+          "x-twitter-client-language": "en",
+          cookie: process.env.TWITTER_COOKIE,
+          Referer: "https://x.com/notifications/mentions",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+        },
+        body: `{"variables":{"tweet_text":"Here's your WHOP! https://whop.com/${productRoute}/","reply":{"in_reply_to_tweet_id":"${tweetId}","exclude_reply_user_ids":[]},"dark_request":false,"media":{"media_entities":[],"possibly_sensitive":false},"semantic_annotation_ids":[],"disallowed_reply_options":null},"features":{"premium_content_api_read_enabled":false,"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,"responsive_web_jetfuel_frame":false,"responsive_web_grok_share_attachment_enabled":true,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"creator_subscriptions_quote_tweet_preview_enabled":false,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,"rweb_tipjar_consumption_enabled":true,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"articles_preview_enabled":true,"rweb_video_timestamps_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"responsive_web_grok_image_annotation_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_enhance_cards_enabled":false},"queryId":"_aUkOlYcrHMY3LR-lUVuSg"}`,
+        method: "POST",
+      }
+    );
+    console.log(`reply to tweet status [${response.status}]`);
+    return;
   } catch (error) {
-    console.error("Error parsing tweet:", error);
-    return null;
+    console.error("Error replying to tweet:", error);
+    throw error;
   }
 }
 
-async function replyToTweet(tweetId, productRoute) {
-  const response = await fetch(
-    "https://x.com/i/api/graphql/_aUkOlYcrHMY3LR-lUVuSg/CreateTweet",
-    {
-      headers: {
-        accept: "*/*",
-        "accept-language": "en-US,en;q=0.9",
-        authorization: process.env.TWITTER_KEY,
-        "content-type": "application/json",
-        priority: "u=1, i",
-        "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-client-transaction-id":
-          "ggIfR+osS23DfDb8hb9ktfgAUBZxGiPfvL0CP+0II6MbGtibw++A2CNo4jx+Iep9iHqEx4FNSBGfKgvnNaJVRubJEIsLgQ",
-        "x-client-uuid": "ec88267e-bfd6-4f4f-9175-20d8ffb5a066",
-        "x-csrf-token":
-          "7e658ae6c2ef040770e5bd59fc267aff07bf408ab3514630164590c8d0589cb930a25e4b2576dd16a6a06d579565d91af9cf53ec0ee4e94ad068a1562561c57696b54912840e572025b112b2fbcd9157",
-        "x-twitter-active-user": "yes",
-        "x-twitter-auth-type": "OAuth2Session",
-        "x-twitter-client-language": "en",
-        cookie: process.env.TWITTER_COOKIE,
-        Referer: "https://x.com/notifications/mentions",
-        "Referrer-Policy": "strict-origin-when-cross-origin",
-      },
-      body: `{"variables":{"tweet_text":"Here's your WHOP! https://whop.com/${productRoute}/","reply":{"in_reply_to_tweet_id":"${tweetId}","exclude_reply_user_ids":[]},"dark_request":false,"media":{"media_entities":[],"possibly_sensitive":false},"semantic_annotation_ids":[],"disallowed_reply_options":null},"features":{"premium_content_api_read_enabled":false,"communities_web_enable_tweet_community_results_fetch":true,"c9s_tweet_anatomy_moderator_badge_enabled":true,"responsive_web_grok_analyze_button_fetch_trends_enabled":false,"responsive_web_grok_analyze_post_followups_enabled":true,"responsive_web_jetfuel_frame":false,"responsive_web_grok_share_attachment_enabled":true,"responsive_web_edit_tweet_api_enabled":true,"graphql_is_translatable_rweb_tweet_is_translatable_enabled":true,"view_counts_everywhere_api_enabled":true,"longform_notetweets_consumption_enabled":true,"responsive_web_twitter_article_tweet_consumption_enabled":true,"tweet_awards_web_tipping_enabled":false,"creator_subscriptions_quote_tweet_preview_enabled":false,"longform_notetweets_rich_text_read_enabled":true,"longform_notetweets_inline_media_enabled":true,"profile_label_improvements_pcf_label_in_post_enabled":true,"rweb_tipjar_consumption_enabled":true,"responsive_web_graphql_exclude_directive_enabled":true,"verified_phone_label_enabled":false,"articles_preview_enabled":true,"rweb_video_timestamps_enabled":true,"responsive_web_graphql_skip_user_profile_image_extensions_enabled":false,"freedom_of_speech_not_reach_fetch_enabled":true,"standardized_nudges_misinfo":true,"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled":true,"responsive_web_grok_image_annotation_enabled":true,"responsive_web_graphql_timeline_navigation_enabled":true,"responsive_web_enhance_cards_enabled":false},"queryId":"_aUkOlYcrHMY3LR-lUVuSg"}`,
-      method: "POST",
-    }
-  );
-  console.log("Reply to tweet response", response);
-}
-let processedTweetIds = [
-  "1882969151230386272",
-  "1882970220945703310",
-  "1882996477053809037",
-  "1883001471031198152",
-  "1882999543354331140",
-  "1883002213074878916",
-  "1883012791940100173",
-];
-
 async function fetchNotifications() {
-  const response = await fetch(
-    "https://x.com/i/api/2/notifications/mentions.json?include_profile_interstitial_type=1&include_blocking=1&include_blocked_by=1&include_followed_by=1&include_want_retweets=1&include_mute_edge=1&include_can_dm=1&include_can_media_tag=1&include_ext_is_blue_verified=1&include_ext_verified_type=1&include_ext_profile_image_shape=1&skip_status=1&cards_platform=Web-12&include_cards=1&include_ext_alt_text=true&include_ext_limited_action_results=true&include_quote_count=true&include_reply_count=1&tweet_mode=extended&include_ext_views=true&include_entities=true&include_user_entities=true&include_ext_media_color=true&include_ext_media_availability=true&include_ext_sensitive_media_warning=true&include_ext_trusted_friends_metadata=true&send_error_codes=true&simple_quoted_tweet=true&count=20&requestContext=launch&ext=mediaStats%2ChighlightedLabel%2CparodyCommentaryFanLabel%2CvoiceInfo%2CbirdwatchPivot%2CsuperFollowMetadata%2CunmentionInfo%2CeditControl%2Carticle",
-    {
-      headers: {
-        accept: "*/*",
-        "accept-language": "en-US,en;q=0.9",
-        authorization: process.env.TWITTER_KEY,
-        "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-client-transaction-id":
-          "HmEVfRqz3w008PvzbdW0XgPuRC1vP4Jf+mS3vpfEnSPKPWs3zFTINdOOJZHbKWRreJIaWx04ZmeHXodHC7VDP/Y6xyauHQ",
-        "x-client-uuid": "ec88267e-bfd6-4f4f-9175-20d8ffb5a066",
-        "x-csrf-token":
-          "7e658ae6c2ef040770e5bd59fc267aff07bf408ab3514630164590c8d0589cb930a25e4b2576dd16a6a06d579565d91af9cf53ec0ee4e94ad068a1562561c57696b54912840e572025b112b2fbcd9157",
-        "x-twitter-active-user": "yes",
-        "x-twitter-auth-type": "OAuth2Session",
-        "x-twitter-client-language": "en",
-        Cookie: process.env.TWITTER_COOKIE,
-        Referer: "https://x.com/notifications/mentions",
-        "Referrer-Policy": "strict-origin-when-cross-origin",
-      },
-      body: null,
-      method: "GET",
-    }
-  );
-
   try {
-    console.log("Fetching notifications...");
+    const response = await fetch(
+      "https://x.com/i/api/2/notifications/all.json?include_profile_interstitial_type=1&include_blocking=1&include_blocked_by=1&include_followed_by=1&include_want_retweets=1&include_mute_edge=1&include_can_dm=1&include_can_media_tag=1&include_ext_is_blue_verified=1&include_ext_verified_type=1&include_ext_profile_image_shape=1&skip_status=1&cards_platform=Web-12&include_cards=1&include_ext_alt_text=true&include_ext_limited_action_results=true&include_quote_count=true&include_reply_count=1&tweet_mode=extended&include_ext_views=true&include_entities=true&include_user_entities=true&include_ext_media_color=true&include_ext_media_availability=true&include_ext_sensitive_media_warning=true&include_ext_trusted_friends_metadata=true&send_error_codes=true&simple_quoted_tweet=true&count=20&requestContext=launch&ext=mediaStats%2ChighlightedLabel%2CparodyCommentaryFanLabel%2CvoiceInfo%2CbirdwatchPivot%2CsuperFollowMetadata%2CunmentionInfo%2CeditControl%2Carticle",
+      {
+        headers: {
+          accept: "*/*",
+          "accept-language": "en-US,en;q=0.9",
+          authorization: process.env.TWITTER_BEARER_TOKEN,
 
+          priority: "u=1, i",
+          "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"macOS"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "x-client-transaction-id":
+            "lb6B8TgboL9RPFydpKXMLhyW5/p30+bvYiGXC2YJWtQi52mz2H/L7VDlIFOevHAZEkWA0JbatlgB2ejQYPYjyZjtnJcjlg",
+          "x-client-uuid": "ec88267e-bfd6-4f4f-9175-20d8ffb5a066",
+          "x-csrf-token":
+            "7e658ae6c2ef040770e5bd59fc267aff07bf408ab3514630164590c8d0589cb930a25e4b2576dd16a6a06d579565d91af9cf53ec0ee4e94ad068a1562561c57696b54912840e572025b112b2fbcd9157",
+          "x-twitter-active-user": "yes",
+          "x-twitter-auth-type": "OAuth2Session",
+          "x-twitter-client-language": "en",
+          "x-twitter-polling": "true",
+          Cookie: process.env.TWITTER_COOKIE,
+          Referer: "https://x.com/notifications",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+        },
+        body: null,
+        method: "GET",
+      }
+    );
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
     const notifications = data.globalObjects?.tweets;
+
+    return notifications;
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    throw error;
+  }
+}
+
+async function monitorNotifications() {
+  try {
+    const notifications = await fetchNotifications();
 
     if (notifications && typeof notifications === "object") {
       for (const key in notifications) {
@@ -577,18 +571,18 @@ async function fetchNotifications() {
           const tweetId = notification.id_str;
           const tweetText = notification.full_text;
 
-          // Check if the tweet has already been processed
           if (processedTweetIds.includes(tweetId)) {
             continue;
           }
 
-          const match = tweetText.match(/@pookybypass a Whop for my (.+)/i);
+          const match = tweetText.match(
+            new RegExp(`${process.env.TWEET_TRIGGER_PATTERN} (.+)`, "i")
+          );
 
           if (match) {
             const businessName = match[1];
-            console.log(`Found token name: ${businessName}`);
-            processedTweetIds.push(tweetId); // Add tweet ID to processed list
-            // You can now proceed to create a Whop store for this token
+            processedTweetIds.push(tweetId);
+
             const route = await createEnhancedWhop(businessName);
             await replyToTweet(tweetId, route);
           }
@@ -604,4 +598,28 @@ async function fetchNotifications() {
   }
 }
 
-setInterval(fetchNotifications, 10000);
+async function fetchPastNotifs() {
+  try {
+    const notifications = await fetchNotifications();
+
+    if (notifications && typeof notifications === "object") {
+      for (const key in notifications) {
+        if (notifications.hasOwnProperty(key)) {
+          const notification = notifications[key];
+          const tweetId = notification.id_str;
+
+          processedTweetIds.push(tweetId);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching past notifications:", error);
+  }
+}
+
+async function main() {
+  await fetchPastNotifs();
+  setInterval(monitorNotifications, 10000);
+}
+
+main();
