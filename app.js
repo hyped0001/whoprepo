@@ -49,12 +49,12 @@ async function generateStoreAssets(businessName) {
       messages: [
         {
           role: "user",
-          content: `Write a bold, attention-grabbing one-liner claim for the ${businessName} business.`,
+          content: `Write a bold, attention-grabbing one-liner claim for the ${businessName} business. Maximum 60 characters.`,
         },
       ],
     });
 
-    const boldClaim = claimResponse.choices[0].message.content;
+    const boldClaim = claimResponse.choices[0].message.content.slice(0, 60);
 
     // Generate bold title
     const titleResponse = await openai.chat.completions.create({
@@ -62,12 +62,12 @@ async function generateStoreAssets(businessName) {
       messages: [
         {
           role: "user",
-          content: `Write a bold, attention-grabbing one-liner title for the ${businessName} business. The title should be a single sentence that captures the essence of the business and describes the outcome. EX: for a sports betting busienss: "REAL $5,000 - $50,000 BET SLIPS DAILY FROM LAS VEGFAS!"`,
+          content: `Write a bold, attention-grabbing one-liner title for the ${businessName} business. The title should be a single sentence that captures the essence of the business and describes the outcome. EX: for a sports betting busienss: "REAL $5,000 - $50,000 BET SLIPS DAILY FROM LAS VEGFAS! Maximum 30 characters.`,
         },
       ],
     });
 
-    const title = titleResponse.choices[0].message.content;
+    const title = titleResponse.choices[0].message.content.slice(0, 30);
 
     return {
       logoUrl,
@@ -111,9 +111,18 @@ async function prepareStoreAssets(businessName) {
   };
 }
 
-async function createWhopStore(companyId, businessName) {
+async function createWhopStore(companyId, businessName, boldClaim) {
   try {
-    let data = `[\n    {\n        "companyId": "${companyId}",\n        "title": "${businessName}",\n        "name": "${businessName}",\n        "headline": "test",\n        "activateWhopFour": true\n    }\n]`;
+    let data = JSON.stringify([
+      {
+        companyId: companyId,
+        title: businessName,
+        name: businessName,
+        headline: boldClaim,
+        activateWhopFour: true,
+      },
+    ]);
+    console.log(data);
 
     let config = {
       method: "post",
@@ -149,6 +158,7 @@ async function createWhopStore(companyId, businessName) {
     };
 
     const response = await axios.request(config);
+    console.log("create store", response.body);
 
     // Parse the response data which is in a special format
     const lines = response.data.split("\n");
@@ -190,7 +200,7 @@ async function createWhopStore(companyId, businessName) {
 
 async function createChatApp(productRoute, companyId, accessPassId) {
   try {
-    const response = await fetch("https://whop.com/tokenization-30/", {
+    const response = await fetch(`https://whop.com/${productRouter}/`, {
       headers: {
         accept: "text/x-component",
         "accept-language": "en-US,en;q=0.9",
@@ -214,7 +224,7 @@ async function createChatApp(productRoute, companyId, accessPassId) {
           "4200517@nr=0-1-4200517-1120347029-4c8a1eda6175e7ec----1737775479853",
         "x-deployment-id": "dpl_8FjNEMeTWP7yPV7Ta7FjLa4Z7BMb",
         Cookie: process.env.WHOP_COOKIE,
-        Referer: "https://whop.com/tokenization-30/",
+        Referer: `https://whop.com/${productRoute}/`,
         "Referrer-Policy": "strict-origin-when-cross-origin",
       },
       body: `[{"companyId":"${companyId}","accessPassId":"${accessPassId}","productRoute":"${productRoute}","appId":"app_xml5hbizmZPgUT","name":"Chat"}]`,
@@ -329,9 +339,11 @@ async function uploadWhopLogoImage(
   companyId,
   accessPassId,
   imageUrl,
-  businessName
+  businessName,
+  boldClaim,
+  description
 ) {
-  const response = await fetch("https://whop.com/tokenization-cf/", {
+  const response = await fetch(`https://whop.com/${productRoute}/`, {
     headers: {
       accept: "text/x-component",
       "accept-language": "en-US,en;q=0.9",
@@ -354,11 +366,11 @@ async function uploadWhopLogoImage(
       tracestate:
         "4200517@nr=0-1-4200517-1120347029-c92b792887a39978----1737777269726",
       "x-deployment-id": "dpl_EwLWMxzZVg8Yuq726Pbv6xHEiqLo",
-      Referer: "https://whop.com/tokenization-cf/",
+      Referer: `https://whop.com/${productRoute}/`,
       "Referrer-Policy": "strict-origin-when-cross-origin",
       Cookie: process.env.WHOP_COOKIE,
     },
-    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"${businessName}","headline":"${boldCLaim}","shortenedDescription":"${description}","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
+    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"${businessName}","headline":"${boldClaim}","shortenedDescription":"${description}","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
     method: "POST",
   });
 
@@ -399,7 +411,7 @@ async function updateWhopWithImage(
   accessPassId,
   imageUrl
 ) {
-  const response = await fetch("https://whop.com/consstruction-12/", {
+  const response = await fetch(`https://whop.com/${productRoute}/`, {
     headers: {
       accept: "text/x-component",
       "accept-language": "en-US,en;q=0.9",
@@ -438,7 +450,11 @@ async function createEnhancedWhop(businessName) {
     const companyId = "biz_xpYFVNnIXn36wK";
 
     const assets = await prepareStoreAssets(businessName);
-    const { id, route } = await createWhopStore(companyId, assets.title);
+    const { id, route } = await createWhopStore(
+      companyId,
+      assets.title,
+      assets.boldClaim
+    );
 
     // Upload banner image if available
     if (assets.logoImageBuffer) {
