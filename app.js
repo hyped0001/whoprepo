@@ -604,10 +604,4 @@ async function fetchNotifications() {
   }
 }
 
-// setInterval(fetchNotifications, 10000);
-uploadWhopLogoImage(
-  "protein-packed-meals-deliver",
-  "biz_xpYFVNnIXn36wK",
-  "pass_xpYFVNnIXn36wK",
-  "https://assets.whop.com/uploads/2025-01-25/user_3069993_665d2451-c3da-4e5c-b9e8-867aee28475a.png"
-);
+setInterval(fetchNotifications, 10000);
