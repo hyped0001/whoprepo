@@ -56,11 +56,25 @@ async function generateStoreAssets(businessName) {
 
     const boldClaim = claimResponse.choices[0].message.content;
 
+    // Generate bold title
+    const titleResponse = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "user",
+          content: `Write a bold, attention-grabbing one-liner title for the ${businessName} business. The title should be a single sentence that captures the essence of the business and describes the outcome. EX: for a sports betting busienss: "REAL $5,000 - $50,000 BET SLIPS DAILY FROM LAS VEGFAS!"`,
+        },
+      ],
+    });
+
+    const title = titleResponse.choices[0].message.content;
+
     return {
       logoUrl,
       bannerUrl,
       description,
       boldClaim,
+      title,
     };
   } catch (error) {
     console.error("Error generating store assets:", error);
@@ -424,7 +438,7 @@ async function createEnhancedWhop(businessName) {
     const companyId = "biz_xpYFVNnIXn36wK";
 
     const assets = await prepareStoreAssets(businessName);
-    const { id, route } = await createWhopStore(companyId, businessName);
+    const { id, route } = await createWhopStore(companyId, assets.title);
 
     // Upload banner image if available
     if (assets.logoImageBuffer) {
@@ -513,6 +527,7 @@ let processedTweetIds = [
   "1883001471031198152",
   "1882999543354331140",
   "1883002213074878916",
+  "1883012791940100173",
 ];
 
 async function fetchNotifications() {
