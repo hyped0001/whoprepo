@@ -276,12 +276,14 @@ async function uploadImageToS3(presignedUrl, imageBuffer) {
   return uploadedUrl;
 }
 
-async function uploaLogoImage(
+async function uploadLogoImage(
   imageBuffer,
   productRoute,
   companyId,
   accessPassId,
-  tokenName
+  tokenName,
+  boldClaim,
+  description
 ) {
   try {
     // Step 1: Get presigned URL
@@ -298,7 +300,9 @@ async function uploaLogoImage(
       companyId,
       accessPassId,
       imageUrl,
-      tokenName
+      tokenName,
+      boldClaim,
+      description
     );
   } catch (error) {
     console.error("Error uploading logo image:", error);
@@ -340,7 +344,7 @@ async function uploadWhopLogoImage(
       "Referrer-Policy": "strict-origin-when-cross-origin",
       Cookie: process.env.WHOP_COOKIE,
     },
-    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"${tokenName}","headline":"Tokenization WHOP","shortenedDescription":"$undefined","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
+    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"${tokenName}","headline":"${boldCLaim}","shortenedDescription":"${description}","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
     method: "POST",
   });
 
@@ -424,12 +428,14 @@ async function createEnhancedWhop(tokenName) {
 
     // Upload banner image if available
     if (assets.logoImageBuffer) {
-      await uploaLogoImage(
+      await uploadLogoImage(
         assets.logoImageBuffer,
         route,
         companyId,
         id,
-        tokenName
+        tokenName,
+        assets.boldClaim,
+        assets.description
       );
     }
 
