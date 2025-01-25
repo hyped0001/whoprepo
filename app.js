@@ -304,10 +304,7 @@ async function uploadLogoImage(
   imageBuffer,
   productRoute,
   companyId,
-  accessPassId,
-  businessName,
-  boldClaim,
-  description
+  accessPassId
 ) {
   try {
     // Step 1: Get presigned URL
@@ -323,10 +320,7 @@ async function uploadLogoImage(
       productRoute,
       companyId,
       accessPassId,
-      imageUrl,
-      businessName,
-      boldClaim,
-      description
+      imageUrl
     );
   } catch (error) {
     console.error("Error uploading logo image:", error);
@@ -338,10 +332,7 @@ async function uploadWhopLogoImage(
   productRoute,
   companyId,
   accessPassId,
-  imageUrl,
-  businessName,
-  boldClaim,
-  description
+  imageUrl
 ) {
   const response = await fetch(`https://whop.com/${productRoute}/`, {
     headers: {
@@ -370,7 +361,7 @@ async function uploadWhopLogoImage(
       "Referrer-Policy": "strict-origin-when-cross-origin",
       Cookie: process.env.WHOP_COOKIE,
     },
-    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"${businessName}","headline":"${boldClaim}","shortenedDescription":"${description}","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
+    body: `[{"companyId":"${companyId}","pass":{"id":"${accessPassId}","title":"$undefined","headline":"$undefined","shortenedDescription":"$undefined","creatorPitch":"$undefined","visibility":"visible","globalAffiliateStatus":"$undefined","globalAffiliatePercentage":"$undefined","redirectPurchaseUrl":"","customCta":"join","customCtaUrl":"","image":"${imageUrl}"},"images":"$undefined","affiliateAssets":"$undefined","productRoute":"${productRoute}","category":"$undefined","subcategory":"$undefined","pathname":"/${productRoute}/","upsells":"$undefined","popupPromo":{"enabled":false,"discountPercentage":"$undefined"}}]`,
     method: "POST",
   });
 
@@ -458,15 +449,7 @@ async function createEnhancedWhop(businessName) {
 
     // Upload banner image if available
     if (assets.logoImageBuffer) {
-      await uploadLogoImage(
-        assets.logoImageBuffer,
-        route,
-        companyId,
-        id,
-        businessName,
-        assets.boldClaim,
-        assets.description
-      );
+      await uploadLogoImage(assets.logoImageBuffer, route, companyId, id);
     }
 
     if (assets.bannerImageBuffer) {
@@ -621,4 +604,10 @@ async function fetchNotifications() {
   }
 }
 
-setInterval(fetchNotifications, 10000);
+// setInterval(fetchNotifications, 10000);
+uploadWhopLogoImage(
+  "protein-packed-meals-deliver",
+  "biz_xpYFVNnIXn36wK",
+  "pass_xpYFVNnIXn36wK",
+  "https://assets.whop.com/uploads/2025-01-25/user_3069993_665d2451-c3da-4e5c-b9e8-867aee28475a.png"
+);
