@@ -583,13 +583,11 @@ async function fetchNotifications() {
             continue;
           }
 
-          const match = tweetText.match(
-            /@pookybypass a Whop for my (?:[a-zA-Z\s]+)?\$?([A-Za-z0-9_]+)/i
-          );
+          const match = tweetText.match(/@pookybypass a Whop for my (.+)/i);
 
           if (match) {
             const businessName = match[1];
-            console.log(`Found token name: $${businessName}`);
+            console.log(`Found token name: ${businessName}`);
             processedTweetIds.push(tweetId); // Add tweet ID to processed list
             // You can now proceed to create a Whop store for this token
             const route = await createEnhancedWhop(businessName);
