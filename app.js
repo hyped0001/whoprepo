@@ -200,7 +200,7 @@ async function createWhopStore(companyId, businessName, boldClaim) {
 
 async function createChatApp(productRoute, companyId, accessPassId) {
   try {
-    const response = await fetch(`https://whop.com/${productRouter}/`, {
+    const response = await fetch(`https://whop.com/${productRoute}/`, {
       headers: {
         accept: "text/x-component",
         "accept-language": "en-US,en;q=0.9",
